@@ -1,0 +1,221 @@
+"""HTTP client with automatic retries and error mapping."""
+
+from __future__ import annotations
+
+import time
+from typing import Any, Optional
+
+import httpx
+
+from .errors import AslanError, AslanErrorCode
+
+_SDK_VERSION = "0.1.0"
+_USER_AGENT = f"aslan-payment-python/{_SDK_VERSION}"
+
+_RETRYABLE_STATUS_CODES = frozenset({408, 429, 500, 502, 503, 504})
+
+
+def _map_error_code(status: int, server_code: Optional[str] = None) -> AslanErrorCode:
+    if server_code == "VALIDATION_ERROR":
+        return "VALIDATION_ERROR"
+    if server_code == "IDEMPOTENCY_ERROR":
+        return "IDEMPOTENCY_ERROR"
+    mapping: dict[int, AslanErrorCode] = {
+        401: "AUTHENTICATION_ERROR",
+        403: "AUTHORIZATION_ERROR",
+        404: "NOT_FOUND",
+        409: "IDEMPOTENCY_ERROR",
+        422: "VALIDATION_ERROR",
+        429: "RATE_LIMITED",
+    }
+    if status in mapping:
+        return mapping[status]
+    return "SERVER_ERROR" if status >= 500 else "VALIDATION_ERROR"
+
+
+def _build_headers(
+    secret_key: str,
+    extra: Optional[dict[str, str]] = None,
+) -> dict[str, str]:
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {secret_key}",
+        "User-Agent": _USER_AGENT,
+    }
+    if extra:
+        headers.update(extra)
+    return headers
+
+
+def _handle_error_response(response: httpx.Response, request_id: Optional[str]) -> None:
+    try:
+        body = response.json()
+    except Exception:
+        raise AslanError(
+            "SERVER_ERROR",
+            f"Unexpected response from server ({response.status_code})",
+            http_status=response.status_code,
+            request_id=request_id,
+        )
+
+    error_data = body.get("error", {})
+    code = _map_error_code(response.status_code, error_data.get("code"))
+    raise AslanError(
+        code,
+        error_data.get("message", f"Request failed with status {response.status_code}"),
+        http_status=response.status_code,
+        details=error_data.get("details"),
+        request_id=request_id,
+    )
+
+
+def http_request(
+    *,
+    method: str,
+    path: str,
+    secret_key: str,
+    base_url: str,
+    timeout: float,
+    max_retries: int,
+    body: Optional[dict[str, Any]] = None,
+    query: Optional[dict[str, Any]] = None,
+    headers: Optional[dict[str, str]] = None,
+) -> Any:
+    """Synchronous HTTP request with exponential backoff retries."""
+    url = base_url.rstrip("/") + path
+    request_headers = _build_headers(secret_key, headers)
+
+    # Filter out None values from query params
+    params: Optional[dict[str, str]] = None
+    if query:
+        params = {k: str(v) for k, v in query.items() if v is not None}
+
+    # Filter out None values from body
+    json_body: Optional[dict[str, Any]] = None
+    if body is not None:
+        json_body = {k: v for k, v in body.items() if v is not None}
+
+    last_error: Optional[AslanError] = None
+
+    for attempt in range(max_retries + 1):
+        if attempt > 0:
+            delay = min(0.5 * (2 ** (attempt - 1)), 5.0)
+            time.sleep(delay)
+
+        try:
+            with httpx.Client(timeout=timeout) as client:
+                response = client.request(
+                    method,
+                    url,
+                    headers=request_headers,
+                    params=params,
+                    json=json_body if method != "GET" else None,
+                )
+
+            request_id = response.headers.get("x-request-id")
+
+            if response.status_code in _RETRYABLE_STATUS_CODES and attempt < max_retries:
+                last_error = AslanError(
+                    "SERVER_ERROR",
+                    f"Request failed with status {response.status_code}",
+                    http_status=response.status_code,
+                    request_id=request_id,
+                )
+                continue
+
+            if response.status_code == 204:
+                return None
+
+            if not response.is_success:
+                _handle_error_response(response, request_id)
+
+            return response.json()
+
+        except AslanError:
+            raise
+        except httpx.TimeoutException:
+            last_error = AslanError("NETWORK_ERROR", "Request timed out")
+            if attempt < max_retries:
+                continue
+        except httpx.HTTPError as exc:
+            last_error = AslanError("NETWORK_ERROR", f"Network request failed: {exc}")
+            if attempt < max_retries:
+                continue
+
+    raise last_error or AslanError("NETWORK_ERROR", "Request failed after retries")
+
+
+async def async_http_request(
+    *,
+    method: str,
+    path: str,
+    secret_key: str,
+    base_url: str,
+    timeout: float,
+    max_retries: int,
+    body: Optional[dict[str, Any]] = None,
+    query: Optional[dict[str, Any]] = None,
+    headers: Optional[dict[str, str]] = None,
+) -> Any:
+    """Asynchronous HTTP request with exponential backoff retries."""
+    import asyncio
+
+    url = base_url.rstrip("/") + path
+    request_headers = _build_headers(secret_key, headers)
+
+    params: Optional[dict[str, str]] = None
+    if query:
+        params = {k: str(v) for k, v in query.items() if v is not None}
+
+    json_body: Optional[dict[str, Any]] = None
+    if body is not None:
+        json_body = {k: v for k, v in body.items() if v is not None}
+
+    last_error: Optional[AslanError] = None
+
+    for attempt in range(max_retries + 1):
+        if attempt > 0:
+            delay = min(0.5 * (2 ** (attempt - 1)), 5.0)
+            await asyncio.sleep(delay)
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.request(
+                    method,
+                    url,
+                    headers=request_headers,
+                    params=params,
+                    json=json_body if method != "GET" else None,
+                )
+
+            request_id = response.headers.get("x-request-id")
+
+            if response.status_code in _RETRYABLE_STATUS_CODES and attempt < max_retries:
+                last_error = AslanError(
+                    "SERVER_ERROR",
+                    f"Request failed with status {response.status_code}",
+                    http_status=response.status_code,
+                    request_id=request_id,
+                )
+                continue
+
+            if response.status_code == 204:
+                return None
+
+            if not response.is_success:
+                _handle_error_response(response, request_id)
+
+            return response.json()
+
+        except AslanError:
+            raise
+        except httpx.TimeoutException:
+            last_error = AslanError("NETWORK_ERROR", "Request timed out")
+            if attempt < max_retries:
+                continue
+        except httpx.HTTPError as exc:
+            last_error = AslanError("NETWORK_ERROR", f"Network request failed: {exc}")
+            if attempt < max_retries:
+                continue
+
+    raise last_error or AslanError("NETWORK_ERROR", "Request failed after retries")
