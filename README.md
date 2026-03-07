@@ -5,7 +5,7 @@ Server-side Python library for the [Aslan Payment API](https://doc.aslanpay.ma).
 ## Installation
 
 ```bash
-pip install aslan-payment
+pip install git+https://github.com/Belkouche/aslan-payment-python.git
 ```
 
 ## Quick Start
