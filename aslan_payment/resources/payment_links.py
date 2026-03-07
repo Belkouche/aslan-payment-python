@@ -5,7 +5,15 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from ..http import async_http_request, http_request
-from ..types import CreatePaymentLinkParams, ListPaymentLinksParams, PaginatedResponse, PaymentLink
+from ..types import (
+    CreatePaymentLinkParams,
+    ListPaymentLinksParams,
+    PaginatedResponse,
+    PaymentLink,
+    QrCode,
+    QrCodeParams,
+    UpdatePaymentLinkParams,
+)
 
 
 def _build_body(params: CreatePaymentLinkParams) -> dict[str, Any]:
@@ -17,6 +25,25 @@ def _build_body(params: CreatePaymentLinkParams) -> dict[str, Any]:
         if key in params:
             body[key] = params[key]  # type: ignore[literal-required]
     return body
+
+
+def _build_update_body(params: UpdatePaymentLinkParams) -> dict[str, Any]:
+    body: dict[str, Any] = {}
+    for key in ("description", "status", "max_payments", "expires_at", "metadata"):
+        if key in params:
+            body[key] = params[key]  # type: ignore[literal-required]
+    return body
+
+
+def _build_qr_query(params: Optional[QrCodeParams]) -> Optional[dict[str, Any]]:
+    if not params:
+        return None
+    query: dict[str, Any] = {}
+    if "format" in params:
+        query["format"] = params["format"]
+    if "size" in params:
+        query["size"] = params["size"]
+    return query or None
 
 
 def _build_query(params: Optional[ListPaymentLinksParams]) -> Optional[dict[str, Any]]:
@@ -109,6 +136,58 @@ class PaymentLinks:
             **self._request_kwargs(),
         )
 
+    def update(self, link_id: str, params: UpdatePaymentLinkParams) -> PaymentLink:
+        """Update a payment link.
+
+        Args:
+            link_id: The payment link identifier.
+            params: Fields to update (description, status, max_payments, expires_at, metadata).
+
+        Returns:
+            The updated payment link.
+        """
+        from urllib.parse import quote
+
+        return http_request(
+            method="PATCH",
+            path=f"/api/v1/payment-links/{quote(link_id, safe='')}",
+            body=_build_update_body(params),
+            **self._request_kwargs(),
+        )
+
+    def delete(self, link_id: str) -> None:
+        """Soft-delete a payment link.
+
+        Args:
+            link_id: The payment link identifier.
+        """
+        from urllib.parse import quote
+
+        http_request(
+            method="DELETE",
+            path=f"/api/v1/payment-links/{quote(link_id, safe='')}",
+            **self._request_kwargs(),
+        )
+
+    def get_qr(self, link_id: str, params: Optional[QrCodeParams] = None) -> QrCode:
+        """Get QR code for a payment link.
+
+        Args:
+            link_id: The payment link identifier.
+            params: Optional QR code parameters (format, size).
+
+        Returns:
+            The QR code data.
+        """
+        from urllib.parse import quote
+
+        return http_request(
+            method="GET",
+            path=f"/api/v1/payment-links/{quote(link_id, safe='')}/qr",
+            query=_build_qr_query(params),
+            **self._request_kwargs(),
+        )
+
 
 class AsyncPaymentLinks:
     """Asynchronous payment links resource."""
@@ -184,5 +263,57 @@ class AsyncPaymentLinks:
             method="GET",
             path="/api/v1/payment-links",
             query=_build_query(params),
+            **self._request_kwargs(),
+        )
+
+    async def update(self, link_id: str, params: UpdatePaymentLinkParams) -> PaymentLink:
+        """Update a payment link (async).
+
+        Args:
+            link_id: The payment link identifier.
+            params: Fields to update (description, status, max_payments, expires_at, metadata).
+
+        Returns:
+            The updated payment link.
+        """
+        from urllib.parse import quote
+
+        return await async_http_request(
+            method="PATCH",
+            path=f"/api/v1/payment-links/{quote(link_id, safe='')}",
+            body=_build_update_body(params),
+            **self._request_kwargs(),
+        )
+
+    async def delete(self, link_id: str) -> None:
+        """Soft-delete a payment link (async).
+
+        Args:
+            link_id: The payment link identifier.
+        """
+        from urllib.parse import quote
+
+        await async_http_request(
+            method="DELETE",
+            path=f"/api/v1/payment-links/{quote(link_id, safe='')}",
+            **self._request_kwargs(),
+        )
+
+    async def get_qr(self, link_id: str, params: Optional[QrCodeParams] = None) -> QrCode:
+        """Get QR code for a payment link (async).
+
+        Args:
+            link_id: The payment link identifier.
+            params: Optional QR code parameters (format, size).
+
+        Returns:
+            The QR code data.
+        """
+        from urllib.parse import quote
+
+        return await async_http_request(
+            method="GET",
+            path=f"/api/v1/payment-links/{quote(link_id, safe='')}/qr",
+            query=_build_qr_query(params),
             **self._request_kwargs(),
         )

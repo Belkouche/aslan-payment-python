@@ -154,6 +154,26 @@ class ListPaymentLinksParams(TypedDict, total=False):
     status: PaymentLinkStatus
 
 
+class UpdatePaymentLinkParams(TypedDict, total=False):
+    description: str
+    status: PaymentLinkStatus
+    max_payments: int
+    expires_at: str  # ISO 8601 datetime string
+    metadata: dict[str, str]
+
+
+class QrCodeParams(TypedDict, total=False):
+    format: Literal["png", "svg"]
+    size: int
+
+
+class QrCode(TypedDict, total=False):
+    url: str
+    format: str
+    size: int
+    data: str
+
+
 # ── Refunds ──
 
 RefundStatus = Literal["pending", "succeeded", "failed"]
@@ -173,6 +193,13 @@ class Refund(TypedDict, total=False):
     status: RefundStatus
     reason: str
     created_at: str
+
+
+class ListRefundsParams(TypedDict, total=False):
+    page: int
+    page_size: int
+    status: RefundStatus
+    transaction_id: str
 
 
 # ── Webhooks ──
