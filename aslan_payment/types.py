@@ -5,7 +5,7 @@ All types use TypedDict for maximum compatibility and zero runtime overhead.
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional, TypedDict
+from typing import Any, Dict, List, Literal, Optional, TypedDict
 
 
 # ── Checkout Sessions ──
@@ -41,6 +41,26 @@ class LineItem(TypedDict, total=False):
     seller_id: str
 
 
+class SellerParams(TypedDict, total=False):
+    id: str  # Required at runtime
+    name: str  # Required at runtime
+    email: str
+    commissionRate: int  # 0-10000 basis points
+    fixedFee: int
+    metadata: Dict[str, str]
+
+
+class BrowserInfo(TypedDict, total=False):
+    userAgent: str
+    acceptHeader: str
+    language: str
+    colorDepth: int
+    screenHeight: int
+    screenWidth: int
+    timeZoneOffset: int
+    javaEnabled: bool
+
+
 class CreateCheckoutSessionParams(TypedDict, total=False):
     amount: int  # Required: amount in centimes (100 = 1.00 MAD)
     currency: Literal["MAD"]
@@ -51,6 +71,10 @@ class CreateCheckoutSessionParams(TypedDict, total=False):
     shipping_address: ShippingAddress
     line_items: list[LineItem]
     metadata: dict[str, str]
+    sellers: list[SellerParams]
+    browserInfo: BrowserInfo
+    require3ds: bool
+    vendorId: str
 
 
 class CheckoutSession(TypedDict, total=False):
@@ -62,6 +86,7 @@ class CheckoutSession(TypedDict, total=False):
     currency: str
     status: str
     metadata: dict[str, str]
+    openAmount: bool
 
 
 # ── Transactions ──
@@ -123,12 +148,15 @@ class PaginatedResponse(TypedDict):
 
 
 class CreatePaymentLinkParams(TypedDict, total=False):
-    amount: int  # Required: amount in centimes
+    amount: Optional[int]  # Optional: amount in centimes (null = open amount)
     currency: Literal["MAD"]
     description: str
     max_payments: int
     expires_at: str  # ISO 8601 datetime string
     metadata: dict[str, str]
+    minAmount: int
+    maxAmount: int
+    vendorId: str
 
 
 PaymentLinkStatus = Literal["active", "inactive", "expired"]
@@ -137,7 +165,7 @@ PaymentLinkStatus = Literal["active", "inactive", "expired"]
 class PaymentLink(TypedDict, total=False):
     id: str
     url: str
-    amount: int
+    amount: Optional[int]
     currency: str
     description: str
     status: PaymentLinkStatus
@@ -176,7 +204,14 @@ class QrCode(TypedDict, total=False):
 
 # ── Refunds ──
 
-RefundStatus = Literal["pending", "succeeded", "failed"]
+RefundStatus = Literal[
+    "pending",
+    "approved",
+    "processing",
+    "succeeded",
+    "failed",
+    "rejected",
+]
 
 
 class CreateRefundParams(TypedDict, total=False):
@@ -210,3 +245,111 @@ class WebhookEvent(TypedDict, total=False):
     type: str
     data: dict[str, Any]
     created_at: str
+
+
+# ── Vendors ──
+
+
+class Vendor(TypedDict, total=False):
+    id: str
+    externalId: Optional[str]
+    name: str
+    email: Optional[str]
+    commissionRate: Optional[float]
+    isActive: bool
+    metadata: Optional[Dict[str, str]]
+    createdAt: str
+    updatedAt: str
+
+
+class CreateVendorParams(TypedDict, total=False):
+    name: str  # Required at runtime
+    externalId: str
+    email: str
+    commissionRate: float
+    metadata: Dict[str, str]
+
+
+class UpdateVendorParams(TypedDict, total=False):
+    name: str
+    email: Optional[str]
+    commissionRate: Optional[float]
+    externalId: Optional[str]
+    isActive: bool
+    metadata: Dict[str, str]
+
+
+class ListVendorsParams(TypedDict, total=False):
+    page: int
+    limit: int
+    search: str
+    isActive: bool
+
+
+class VendorListResponse(TypedDict):
+    data: List[Vendor]
+    total: int
+    page: int
+    limit: int
+    totalPages: int
+
+
+# ── Customers ──
+
+
+class Customer(TypedDict, total=False):
+    id: str
+    email: Optional[str]
+    name: Optional[str]
+    phone: Optional[str]
+    createdAt: str
+    transactionCount: int
+    totalSpent: int
+
+
+class ListCustomersParams(TypedDict, total=False):
+    page: int
+    pageSize: int
+    search: str
+    sortBy: str
+    sortOrder: str
+
+
+# ── API Keys ──
+
+
+class ApiKey(TypedDict, total=False):
+    id: str
+    name: str
+    type: str
+    prefix: str
+    publishableKey: str
+    secretKey: str  # Only present on creation
+    createdAt: str
+
+
+class CreateApiKeyParams(TypedDict):
+    name: str
+    type: str  # "live" | "test"
+
+
+# ── Webhooks Config ──
+
+WebhookEventType = Literal[
+    "payment.succeeded",
+    "payment.failed",
+    "payment.expired",
+    "refund.created",
+    "refund.updated",
+]
+
+
+class WebhookConfig(TypedDict, total=False):
+    url: str
+    secret: str
+    events: List[str]
+
+
+class UpdateWebhookConfigParams(TypedDict, total=False):
+    url: str  # Required at runtime
+    events: List[str]

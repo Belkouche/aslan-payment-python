@@ -5,11 +5,15 @@ from __future__ import annotations
 from typing import Optional
 
 from .errors import AslanError
+from .resources.api_keys import ApiKeys, AsyncApiKeys
 from .resources.checkout_sessions import AsyncCheckoutSessions, CheckoutSessions
+from .resources.customers import AsyncCustomers, Customers
 from .resources.payment_links import AsyncPaymentLinks, PaymentLinks
 from .resources.refunds import AsyncRefunds, Refunds
 from .resources.transactions import AsyncTransactions, Transactions
+from .resources.vendors import AsyncVendors, Vendors
 from .resources.webhooks import Webhooks
+from .resources.webhooks_config import AsyncWebhooksConfig, WebhooksConfig
 
 _DEFAULT_BASE_URL = "https://api.aslanpay.ma/pay"
 _DEFAULT_TIMEOUT = 30.0
@@ -45,6 +49,10 @@ class Aslan:
     transactions: Transactions
     payment_links: PaymentLinks
     refunds: Refunds
+    vendors: Vendors
+    customers: Customers
+    api_keys: ApiKeys
+    webhooks_config: WebhooksConfig
 
     def __init__(
         self,
@@ -70,6 +78,10 @@ class Aslan:
         self.transactions = Transactions(*args)
         self.payment_links = PaymentLinks(*args)
         self.refunds = Refunds(*args)
+        self.vendors = Vendors(*args)
+        self.customers = Customers(*args)
+        self.api_keys = ApiKeys(*args)
+        self.webhooks_config = WebhooksConfig(*args)
 
     @property
     def is_test_mode(self) -> bool:
@@ -121,6 +133,10 @@ class AsyncAslan:
     transactions: AsyncTransactions
     payment_links: AsyncPaymentLinks
     refunds: AsyncRefunds
+    vendors: AsyncVendors
+    customers: AsyncCustomers
+    api_keys: AsyncApiKeys
+    webhooks_config: AsyncWebhooksConfig
 
     def __init__(
         self,
@@ -146,6 +162,10 @@ class AsyncAslan:
         self.transactions = AsyncTransactions(*args)
         self.payment_links = AsyncPaymentLinks(*args)
         self.refunds = AsyncRefunds(*args)
+        self.vendors = AsyncVendors(*args)
+        self.customers = AsyncCustomers(*args)
+        self.api_keys = AsyncApiKeys(*args)
+        self.webhooks_config = AsyncWebhooksConfig(*args)
 
     @property
     def is_test_mode(self) -> bool:

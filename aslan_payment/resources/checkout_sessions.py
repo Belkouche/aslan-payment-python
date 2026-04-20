@@ -30,7 +30,17 @@ def _build_body(params: CreateCheckoutSessionParams) -> dict[str, Any]:
         "success_url": params["success_url"],
         "cancel_url": params["cancel_url"],
     }
-    for key in ("customer", "billing_address", "shipping_address", "line_items", "metadata"):
+    for key in (
+        "customer",
+        "billing_address",
+        "shipping_address",
+        "line_items",
+        "metadata",
+        "sellers",
+        "browserInfo",
+        "require3ds",
+        "vendorId",
+    ):
         if key in params:
             body[key] = params[key]  # type: ignore[literal-required]
     return body

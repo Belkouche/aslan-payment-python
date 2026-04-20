@@ -18,10 +18,12 @@ from ..types import (
 
 def _build_body(params: CreatePaymentLinkParams) -> dict[str, Any]:
     body: dict[str, Any] = {
-        "amount": params["amount"],
         "currency": params.get("currency", "MAD"),
     }
-    for key in ("description", "max_payments", "expires_at", "metadata"):
+    # amount is optional (None = open amount payment link)
+    if "amount" in params:
+        body["amount"] = params["amount"]
+    for key in ("description", "max_payments", "expires_at", "metadata", "minAmount", "maxAmount", "vendorId"):
         if key in params:
             body[key] = params[key]  # type: ignore[literal-required]
     return body
