@@ -23,7 +23,7 @@ def _build_body(params: CreatePaymentLinkParams) -> dict[str, Any]:
     # amount is optional (None = open amount payment link)
     if "amount" in params:
         body["amount"] = params["amount"]
-    for key in ("description", "max_payments", "expires_at", "metadata", "minAmount", "maxAmount", "vendorId"):
+    for key in ("description", "max_payments", "expires_at", "metadata", "minAmount", "maxAmount", "vendorId", "providerAccount"):
         if key in params:
             body[key] = params[key]  # type: ignore[literal-required]
     return body

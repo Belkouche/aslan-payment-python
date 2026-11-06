@@ -76,6 +76,12 @@ session = aslan.checkout_sessions.create(
     idempotency_key="unique-key-123",
 )
 
+# Process on an additional PSP account (alias); omit or "default" for the default account.
+# Also supported by payment_links.create. Responses carry "providerAccount".
+session = aslan.checkout_sessions.create(
+    {"amount": 5000, "success_url": "...", "cancel_url": "...", "providerAccount": "foreign"},
+)
+
 # Retrieve a checkout session
 session = aslan.checkout_sessions.retrieve("cs_xxx")
 ```
@@ -194,6 +200,10 @@ except AslanError as e:
 | `IDEMPOTENCY_ERROR` | Idempotency key conflict |
 | `NETWORK_ERROR` | Connection or timeout error |
 | `SERVER_ERROR` | Aslan API server error (5xx) |
+| `PROVIDER_ACCOUNT_NOT_FOUND` | `providerAccount` names no account of your merchant |
+| `PROVIDER_ACCOUNT_INACTIVE` | The `providerAccount` is deactivated |
+| `PROVIDER_ACCOUNT_UNSUPPORTED` | The account's provider cannot take this request |
+| `PROVIDER_ACCOUNT_RECURRING_DISABLED` | The account does not allow recurring payments |
 
 ## Async Usage
 

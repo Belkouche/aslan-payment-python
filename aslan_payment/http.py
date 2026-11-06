@@ -20,6 +20,8 @@ def _map_error_code(status: int, server_code: Optional[str] = None) -> AslanErro
         return "VALIDATION_ERROR"
     if server_code == "IDEMPOTENCY_ERROR":
         return "IDEMPOTENCY_ERROR"
+    if server_code is not None and server_code.startswith("PROVIDER_ACCOUNT_"):
+        return server_code  # type: ignore[return-value]
     mapping: dict[int, AslanErrorCode] = {
         401: "AUTHENTICATION_ERROR",
         403: "AUTHORIZATION_ERROR",

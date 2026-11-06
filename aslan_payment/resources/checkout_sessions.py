@@ -40,6 +40,7 @@ def _build_body(params: CreateCheckoutSessionParams) -> dict[str, Any]:
         "browserInfo",
         "require3ds",
         "vendorId",
+        "providerAccount",
     ):
         if key in params:
             body[key] = params[key]  # type: ignore[literal-required]

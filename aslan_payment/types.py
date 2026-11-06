@@ -75,6 +75,7 @@ class CreateCheckoutSessionParams(TypedDict, total=False):
     browserInfo: BrowserInfo
     require3ds: bool
     vendorId: str
+    providerAccount: str  # Alias of an additional PSP account; omit or "default" for the default account
 
 
 class CheckoutSession(TypedDict, total=False):
@@ -87,6 +88,7 @@ class CheckoutSession(TypedDict, total=False):
     status: str
     metadata: dict[str, str]
     openAmount: bool
+    providerAccount: str  # "default", or the alias of the PSP account that processed/owns this object
 
 
 # ── Transactions ──
@@ -120,6 +122,7 @@ class Transaction(TypedDict, total=False):
     updated_at: str
     metadata: dict[str, str]
     customer: TransactionCustomer
+    providerAccount: str  # "default", or the alias of the PSP account that processed/owns this object
 
 
 class ListTransactionsParams(TypedDict, total=False):
@@ -157,6 +160,7 @@ class CreatePaymentLinkParams(TypedDict, total=False):
     minAmount: int
     maxAmount: int
     vendorId: str
+    providerAccount: str  # Alias of an additional PSP account; omit or "default" for the default account
 
 
 PaymentLinkStatus = Literal["active", "inactive", "expired"]
@@ -174,6 +178,7 @@ class PaymentLink(TypedDict, total=False):
     expires_at: str
     created_at: str
     metadata: dict[str, str]
+    providerAccount: str  # "default", or the alias of the PSP account that processed/owns this object
 
 
 class ListPaymentLinksParams(TypedDict, total=False):
@@ -341,6 +346,13 @@ WebhookEventType = Literal[
     "payment.expired",
     "refund.created",
     "refund.updated",
+    "subscription.renewed",
+    "subscription.payment_failed",
+    "subscription.past_due",
+    "subscription.cancelled",
+    "subscription.plan_changed",
+    "subscription.plan_change_failed",
+    "subscription.renewal_suspended",
 ]
 
 
