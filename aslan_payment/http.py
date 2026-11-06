@@ -20,6 +20,8 @@ def _map_error_code(status: int, server_code: Optional[str] = None) -> AslanErro
         return "VALIDATION_ERROR"
     if server_code == "IDEMPOTENCY_ERROR":
         return "IDEMPOTENCY_ERROR"
+    if server_code is not None and server_code.startswith("PROVIDER_ACCOUNT_"):
+        return server_code  # type: ignore[return-value]
     mapping: dict[int, AslanErrorCode] = {
         401: "AUTHENTICATION_ERROR",
         403: "AUTHORIZATION_ERROR",
@@ -48,25 +50,72 @@ def _build_headers(
 
 
 def _handle_error_response(response: httpx.Response, request_id: Optional[str]) -> None:
-    try:
-        body = response.json()
-    except Exception:
-        raise AslanError(
-            "SERVER_ERROR",
-            f"Unexpected response from server ({response.status_code})",
-            http_status=response.status_code,
-            request_id=request_id,
-        )
+    """Raise an AslanError for any non-2xx response.
 
-    error_data = body.get("error", {})
-    code = _map_error_code(response.status_code, error_data.get("code"))
+    Accepts the flat shape ``{statusCode, code, error, message, details?}`` and the
+    nested shape ``{error: {code, message, details?}}``.
+    """
+    status = response.status_code
+    default_message = f"Request failed with status {status}"
+    try:
+        body: Any = response.json()
+    except Exception:
+        body = None
+
+    source: dict[str, Any] = {}
+    fallback_message: Optional[str] = None
+    if isinstance(body, dict):
+        nested = body.get("error")
+        if isinstance(nested, dict):
+            source = nested
+        else:
+            source = body
+            if isinstance(nested, str):
+                fallback_message = nested  # e.g. "Unauthorized"
+
+    server_code = source.get("code")
+    message = source.get("message")
+    if not isinstance(message, str) or not message:
+        message = fallback_message or (
+            default_message if body is not None else f"Unexpected response from server ({status})"
+        )
     raise AslanError(
-        code,
-        error_data.get("message", f"Request failed with status {response.status_code}"),
-        http_status=response.status_code,
-        details=error_data.get("details"),
+        _map_error_code(status, server_code if isinstance(server_code, str) else None),
+        message,
+        http_status=status,
+        details=source.get("details"),
         request_id=request_id,
     )
+
+
+def _query_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def _parse_success(response: httpx.Response) -> Any:
+    """Decode a 2xx response, unwrapping the ``{"data": X}`` single-object envelope.
+
+    List responses (``{data, pagination}``) and unwrapped objects are returned as-is.
+    Non-JSON bodies (e.g. a raw QR image) are returned as bytes.
+    """
+    if response.status_code == 204 or not response.content:
+        return None
+    if "json" not in response.headers.get("content-type", "application/json"):
+        return response.content
+    try:
+        body = response.json()
+    except ValueError:
+        raise AslanError(
+            "SERVER_ERROR",
+            f"Invalid JSON in response ({response.status_code})",
+            http_status=response.status_code,
+            request_id=response.headers.get("x-request-id"),
+        )
+    if isinstance(body, dict) and len(body) == 1 and "data" in body:
+        return body["data"]
+    return body
 
 
 def http_request(
@@ -88,7 +137,7 @@ def http_request(
     # Filter out None values from query params
     params: Optional[dict[str, str]] = None
     if query:
-        params = {k: str(v) for k, v in query.items() if v is not None}
+        params = {k: _query_value(v) for k, v in query.items() if v is not None}
 
     # Filter out None values from body
     json_body: Optional[dict[str, Any]] = None
@@ -123,13 +172,10 @@ def http_request(
                 )
                 continue
 
-            if response.status_code == 204:
-                return None
-
             if not response.is_success:
                 _handle_error_response(response, request_id)
 
-            return response.json()
+            return _parse_success(response)
 
         except AslanError:
             raise
@@ -165,7 +211,7 @@ async def async_http_request(
 
     params: Optional[dict[str, str]] = None
     if query:
-        params = {k: str(v) for k, v in query.items() if v is not None}
+        params = {k: _query_value(v) for k, v in query.items() if v is not None}
 
     json_body: Optional[dict[str, Any]] = None
     if body is not None:
@@ -199,13 +245,10 @@ async def async_http_request(
                 )
                 continue
 
-            if response.status_code == 204:
-                return None
-
             if not response.is_success:
                 _handle_error_response(response, request_id)
 
-            return response.json()
+            return _parse_success(response)
 
         except AslanError:
             raise

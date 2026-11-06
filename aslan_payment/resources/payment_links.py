@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
+from .._wire import camelize
 from ..http import async_http_request, http_request
 from ..types import (
     CreatePaymentLinkParams,
@@ -17,24 +18,14 @@ from ..types import (
 
 
 def _build_body(params: CreatePaymentLinkParams) -> dict[str, Any]:
-    body: dict[str, Any] = {
-        "currency": params.get("currency", "MAD"),
-    }
-    # amount is optional (None = open amount payment link)
-    if "amount" in params:
-        body["amount"] = params["amount"]
-    for key in ("description", "max_payments", "expires_at", "metadata", "minAmount", "maxAmount", "vendorId"):
-        if key in params:
-            body[key] = params[key]  # type: ignore[literal-required]
+    # amount is optional (omitted or None = open amount payment link)
+    body: dict[str, Any] = camelize(dict(params))
+    body.setdefault("currency", "MAD")
     return body
 
 
 def _build_update_body(params: UpdatePaymentLinkParams) -> dict[str, Any]:
-    body: dict[str, Any] = {}
-    for key in ("description", "status", "max_payments", "expires_at", "metadata"):
-        if key in params:
-            body[key] = params[key]  # type: ignore[literal-required]
-    return body
+    return camelize(dict(params))
 
 
 def _build_qr_query(params: Optional[QrCodeParams]) -> Optional[dict[str, Any]]:
@@ -49,16 +40,7 @@ def _build_qr_query(params: Optional[QrCodeParams]) -> Optional[dict[str, Any]]:
 
 
 def _build_query(params: Optional[ListPaymentLinksParams]) -> Optional[dict[str, Any]]:
-    if not params:
-        return None
-    query: dict[str, Any] = {}
-    if "page" in params:
-        query["page"] = params["page"]
-    if "page_size" in params:
-        query["page_size"] = params["page_size"]
-    if "status" in params:
-        query["status"] = params["status"]
-    return query or None
+    return camelize(dict(params)) if params else None
 
 
 class PaymentLinks:
@@ -171,7 +153,7 @@ class PaymentLinks:
             **self._request_kwargs(),
         )
 
-    def get_qr(self, link_id: str, params: Optional[QrCodeParams] = None) -> QrCode:
+    def get_qr(self, link_id: str, params: Optional[QrCodeParams] = None) -> Union[QrCode, bytes]:
         """Get QR code for a payment link.
 
         Args:
@@ -179,7 +161,8 @@ class PaymentLinks:
             params: Optional QR code parameters (format, size).
 
         Returns:
-            The QR code data.
+            ``{"dataUri", "mimeType"}`` when no ``format`` is given, otherwise the
+            raw image bytes (PNG or SVG).
         """
         from urllib.parse import quote
 
@@ -301,7 +284,7 @@ class AsyncPaymentLinks:
             **self._request_kwargs(),
         )
 
-    async def get_qr(self, link_id: str, params: Optional[QrCodeParams] = None) -> QrCode:
+    async def get_qr(self, link_id: str, params: Optional[QrCodeParams] = None) -> Union[QrCode, bytes]:
         """Get QR code for a payment link (async).
 
         Args:
@@ -309,7 +292,8 @@ class AsyncPaymentLinks:
             params: Optional QR code parameters (format, size).
 
         Returns:
-            The QR code data.
+            ``{"dataUri", "mimeType"}`` when no ``format`` is given, otherwise the
+            raw image bytes (PNG or SVG).
         """
         from urllib.parse import quote
 

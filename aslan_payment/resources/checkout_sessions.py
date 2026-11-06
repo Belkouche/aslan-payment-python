@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from .._wire import camelize
 from ..http import async_http_request, http_request
 from ..types import CheckoutSession, CreateCheckoutSessionParams
 
@@ -24,25 +25,8 @@ class _ConfigMixin:
 
 
 def _build_body(params: CreateCheckoutSessionParams) -> dict[str, Any]:
-    body: dict[str, Any] = {
-        "amount": params["amount"],
-        "currency": params.get("currency", "MAD"),
-        "success_url": params["success_url"],
-        "cancel_url": params["cancel_url"],
-    }
-    for key in (
-        "customer",
-        "billing_address",
-        "shipping_address",
-        "line_items",
-        "metadata",
-        "sellers",
-        "browserInfo",
-        "require3ds",
-        "vendorId",
-    ):
-        if key in params:
-            body[key] = params[key]  # type: ignore[literal-required]
+    body: dict[str, Any] = camelize(dict(params))
+    body.setdefault("currency", "MAD")
     return body
 
 

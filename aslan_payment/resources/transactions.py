@@ -4,28 +4,23 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from .._wire import to_camel
 from ..http import async_http_request, http_request
 from ..types import ListTransactionsParams, PaginatedResponse, Transaction
+
+
+# SDK param name -> API query name, where the rename is not plain snake -> camel.
+_QUERY_RENAMES = {"from_date": "from", "to_date": "to"}
 
 
 def _build_query(params: Optional[ListTransactionsParams]) -> Optional[dict[str, Any]]:
     if not params:
         return None
-    query: dict[str, Any] = {}
-    if "page" in params:
-        query["page"] = params["page"]
-    if "page_size" in params:
-        query["page_size"] = params["page_size"]
-    if "status" in params:
-        query["status"] = params["status"]
-    if "from_date" in params:
-        query["from"] = params["from_date"]
-    if "to_date" in params:
-        query["to"] = params["to_date"]
-    if "sort_by" in params:
-        query["sort_by"] = params["sort_by"]
-    if "sort_order" in params:
-        query["sort_order"] = params["sort_order"]
+    query: dict[str, Any] = {
+        _QUERY_RENAMES.get(k, to_camel(k)): v for k, v in params.items()
+    }
+    if "sortBy" in query:
+        query["sortBy"] = to_camel(query["sortBy"])  # "created_at" -> "createdAt"
     return query or None
 
 
