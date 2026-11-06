@@ -1,6 +1,11 @@
 """Type definitions for the Aslan Payment SDK.
 
 All types use TypedDict for maximum compatibility and zero runtime overhead.
+
+Request params use snake_case keys (camelCase keys are accepted too); the SDK
+converts them to the API's camelCase on the wire. ``metadata`` dicts are sent
+verbatim. Response objects are returned exactly as the API sends them, so their
+keys are camelCase.
 """
 
 from __future__ import annotations
@@ -75,6 +80,8 @@ class CreateCheckoutSessionParams(TypedDict, total=False):
     browserInfo: BrowserInfo
     require3ds: bool
     vendorId: str
+    payment_methods: list[Literal["card", "cash"]]
+    cof: bool
     providerAccount: str  # Alias of an additional PSP account; omit or "default" for the default account
 
 
@@ -82,12 +89,19 @@ class CheckoutSession(TypedDict, total=False):
     id: str
     token: str
     url: str
-    expires_at: str
-    amount: int
+    amount: Optional[int]
     currency: str
     status: str
-    metadata: dict[str, str]
     openAmount: bool
+    expiresAt: str
+    createdAt: str
+    cryptoScheme: str
+    # Present on retrieve:
+    successUrl: str
+    cancelUrl: str
+    customerEmail: Optional[str]
+    customerName: Optional[str]
+    metadata: dict[str, str]
     providerAccount: str  # "default", or the alias of the PSP account that processed/owns this object
 
 
@@ -95,6 +109,8 @@ class CheckoutSession(TypedDict, total=False):
 
 TransactionStatus = Literal[
     "pending",
+    "pending_cash",
+    "cash_late_confirmation",
     "processing",
     "succeeded",
     "failed",
@@ -105,23 +121,31 @@ TransactionStatus = Literal[
 
 
 class TransactionCustomer(TypedDict, total=False):
-    email: str
-    name: str
-    phone: str
+    email: Optional[str]
+    name: Optional[str]
 
 
 class Transaction(TypedDict, total=False):
     id: str
-    amount: int
+    merchantId: str
+    amount: Optional[int]
     currency: str
     status: TransactionStatus
-    merchant_id: str
-    checkout_session_id: str
-    paid_at: str
-    created_at: str
-    updated_at: str
+    type: str
+    mode: str
+    providerRef: Optional[str]
+    providerStatus: Optional[str]
+    checkoutSessionId: Optional[str]
+    errorCode: Optional[str]
+    errorMessage: Optional[str]
+    paidAt: Optional[str]
+    failedAt: Optional[str]
+    expiresAt: Optional[str]
+    createdAt: str
+    updatedAt: str
     metadata: dict[str, str]
-    customer: TransactionCustomer
+    customer: Optional[TransactionCustomer]
+    refunds: list[dict[str, Any]]
     providerAccount: str  # "default", or the alias of the PSP account that processed/owns this object
 
 
@@ -131,15 +155,15 @@ class ListTransactionsParams(TypedDict, total=False):
     status: TransactionStatus
     from_date: str  # ISO 8601 datetime string
     to_date: str  # ISO 8601 datetime string
-    sort_by: Literal["created_at", "amount", "status"]
+    sort_by: Literal["created_at", "createdAt", "amount", "status"]
     sort_order: Literal["asc", "desc"]
 
 
 class Pagination(TypedDict):
-    page: int
-    page_size: int
     total: int
-    total_pages: int
+    page: int
+    pageSize: int
+    totalPages: int
 
 
 class PaginatedResponse(TypedDict):
@@ -163,20 +187,26 @@ class CreatePaymentLinkParams(TypedDict, total=False):
     providerAccount: str  # Alias of an additional PSP account; omit or "default" for the default account
 
 
-PaymentLinkStatus = Literal["active", "inactive", "expired"]
+PaymentLinkStatus = Literal["active", "inactive", "expired", "finalized"]
 
 
 class PaymentLink(TypedDict, total=False):
     id: str
+    merchantId: str
+    shortCode: str
     url: str
     amount: Optional[int]
+    minAmount: Optional[int]
+    maxAmount: Optional[int]
     currency: str
-    description: str
+    description: Optional[str]
     status: PaymentLinkStatus
-    max_payments: int
-    payment_count: int
-    expires_at: str
-    created_at: str
+    maxPayments: Optional[int]
+    paymentCount: int
+    expiresAt: Optional[str]
+    vendorId: Optional[str]
+    createdAt: str
+    updatedAt: str
     metadata: dict[str, str]
     providerAccount: str  # "default", or the alias of the PSP account that processed/owns this object
 
@@ -189,7 +219,7 @@ class ListPaymentLinksParams(TypedDict, total=False):
 
 class UpdatePaymentLinkParams(TypedDict, total=False):
     description: str
-    status: PaymentLinkStatus
+    status: Literal["active", "inactive"]
     max_payments: int
     expires_at: str  # ISO 8601 datetime string
     metadata: dict[str, str]
@@ -201,10 +231,10 @@ class QrCodeParams(TypedDict, total=False):
 
 
 class QrCode(TypedDict, total=False):
-    url: str
-    format: str
-    size: int
-    data: str
+    """Returned when no ``format`` is requested; with a ``format`` the raw image bytes are returned."""
+
+    dataUri: str
+    mimeType: str
 
 
 # ── Refunds ──
@@ -227,12 +257,16 @@ class CreateRefundParams(TypedDict, total=False):
 
 class Refund(TypedDict, total=False):
     id: str
-    transaction_id: str
+    transactionId: str
     amount: int
     currency: str
     status: RefundStatus
-    reason: str
-    created_at: str
+    requiresManual: bool
+    reason: Optional[str]
+    providerRef: Optional[str]
+    approvedAt: Optional[str]
+    approvedBy: Optional[str]
+    createdAt: str
 
 
 class ListRefundsParams(TypedDict, total=False):
@@ -247,9 +281,9 @@ class ListRefundsParams(TypedDict, total=False):
 
 class WebhookEvent(TypedDict, total=False):
     id: str
-    type: str
+    event: str  # e.g. "payment.succeeded"
+    createdAt: str
     data: dict[str, Any]
-    created_at: str
 
 
 # ── Vendors ──
@@ -357,8 +391,8 @@ WebhookEventType = Literal[
 
 
 class WebhookConfig(TypedDict, total=False):
-    url: str
-    secret: str
+    url: Optional[str]
+    secret: Optional[str]
     events: List[str]
 
 

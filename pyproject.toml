@@ -38,6 +38,9 @@ dependencies = [
     "httpx>=0.24.0",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=7", "mypy>=1.0"]
+
 [project.urls]
 Homepage = "https://aslanpay.ma"
 Documentation = "https://doc.aslanpay.ma"
@@ -46,3 +49,6 @@ Issues = "https://github.com/Belkouche/aslan-payment-python/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["aslan_payment"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

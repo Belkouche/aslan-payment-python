@@ -4,33 +4,17 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from .._wire import camelize
 from ..http import async_http_request, http_request
 from ..types import CreateRefundParams, ListRefundsParams, PaginatedResponse, Refund
 
 
 def _build_query(params: Optional[ListRefundsParams]) -> Optional[dict[str, Any]]:
-    if not params:
-        return None
-    query: dict[str, Any] = {}
-    if "page" in params:
-        query["page"] = params["page"]
-    if "page_size" in params:
-        query["page_size"] = params["page_size"]
-    if "status" in params:
-        query["status"] = params["status"]
-    if "transaction_id" in params:
-        query["transactionId"] = params["transaction_id"]
-    return query or None
+    return camelize(dict(params)) if params else None
 
 
 def _build_body(params: CreateRefundParams) -> dict[str, Any]:
-    body: dict[str, Any] = {
-        "transaction_id": params["transaction_id"],
-        "amount": params["amount"],
-    }
-    if "reason" in params:
-        body["reason"] = params["reason"]
-    return body
+    return camelize(dict(params))
 
 
 class Refunds:
